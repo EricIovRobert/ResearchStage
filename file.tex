@@ -1,342 +1,259 @@
-\documentclass{article}
+\documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
-\usepackage{algorithm2e}
-\usepackage{algorithmic}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
 \usepackage{xcolor}
-\usepackage{listings}
 \usepackage{url}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue}
 
-\title{Research Methodology \\ Lab 7-8: Skeleton of the State-of-the-art Report}
+% Placeholder box used in place of figures that are not yet generated.
+\newcommand{\figplaceholder}[1]{%
+  \fbox{\parbox[c][4.5cm][c]{0.85\linewidth}{\centering\textit{[Figure placeholder] #1}}}%
+}
 
-\author{Iov Eric}
+\title{Evaluating Machine Learning Methods for Emergency Department Triage}
 
-\date{April 2026}
+\author{Iov Eric Robert\\
+Artificial Intelligence and Distributed Computing\\
+West University of Timișoara}
+
+\date{June 2026}
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-    This is a generic structure for the State of the art report to be prepared during this semester for Research Stage. The structure of sections and their titles are just to illustrate the idea (you should use more specific title). The final structure of your report should be established together with your advisor.  
-    
+Emergency department overcrowding is a persistent and worsening problem for healthcare systems worldwide, and the triage process at the entrance to the department has become a natural target for automation. Over the past decade a large body of work has applied machine learning to triage, from classical classifiers trained on structured vital signs to hybrid models that also read free-text clinical notes. This report surveys that work and assesses how far it has actually come. Working from a curated set of twelve representative papers published between 2017 and 2026, it sets out the main problem formulations, the methods used to address them, and the results reported, and then turns to a critical analysis built around the distance between reported accuracy and clinical readiness. The central finding is that, although retrospective studies report strong predictive performance with some consistency, the field is still held back by a shortage of prospective and external validation, by the absence of a shared benchmark dataset, by unresolved questions of fairness and explainability, and by a demanding legal and regulatory environment. Drawing on this analysis, the report proposes a set of concrete conditions that a triage model should meet before clinical use and points to the research directions most likely to get the field there, among them federated learning and the routine use of interpretable models.
 \end{abstract}
 
-% todo: select papers and why
-
-\section{Introduction}
-\subsection{Motivation}
-\begin{itemize}
-\item relevance of the topic (from the point of view of the research community, and/or personal perspective) 
-\end{itemize}
-
-\subsection{Context of the research}
-
-\begin{itemize}
-\item main research questions in the field
-
-\item examples of some real-world problems (which might be relevant)
-
-\item  short history of the field - if it is the case
-
-\end{itemize}
-
-\subsection{Aim of the report}
-This subsection should describe the main aim of the report. Some ideas of aims are:
-\begin{itemize}
-\item to provide an overview/ critical analysis of the field
-
-\item to compare different approaches
-
-\item to identify open problems 
-\end{itemize}
-
-\subsection{Structure of the report}
-
-This subsection should contain a short description of each of the other sections.
+\tableofcontents
 
 \section{Introduction}
 
 \subsection{Motivation}
-Emergency Department (ED) overcrowding represents a critical public health crisis globally, severely straining hospital resources and directly compromising patient safety~\cite{Dragan}. Traditional triage frameworks rely heavily on emergency nurses manually evaluating patient vital signs and complaints under immense cognitive loads. Because human triage is susceptible to subjective variation and fatigue, there is an urgent need for intelligent decision support systems. In recent years, the research community has heavily focused on integrating Machine Learning (ML) to optimize this frontline clinical process~\cite{Sanchez2022}. Automating and refining patient sorting through predictive analytics promises to drastically reduce waiting times, accurately prioritize high-acuity cases, and streamline hospital workflow, making it a highly relevant and transformative area of study within healthcare informatics.
+
+The emergency department (ED) is the part of a hospital where uncertainty, time pressure and consequence are at their highest all at once. A patient arrives, and within a few minutes a clinician has to decide how urgently they need care, usually with incomplete information and a queue of other patients waiting. This first decision, triage, shapes everything that follows: who is seen first, which resources are committed, and, in the worst case, who deteriorates while waiting. When the department is overcrowded, as is increasingly the norm in both well-resourced and resource-constrained systems, the quality of that decision tends to fall precisely when it matters most~\cite{Dragan}.
+
+Triage works by sorting arriving patients according to how urgently they need care, so that the sickest are seen first when not everyone can be seen at once. In most departments this is done with a standardised five-level acuity scale such as the Emergency Severity Index (ESI), on which a nurse assigns level 1 to a patient who needs immediate life-saving intervention and level 5 to one with very minor needs, judging the level partly from the patient's condition and partly from how many resources the patient is likely to consume~\cite{Ivanov2021, Hong2018PredictingHA}. Other five-level systems, such as the Manchester Triage System and the Canadian Triage and Acuity Scale, follow the same basic logic. Whichever scale is used, the assignment comes down to a nurse combining the presenting complaint, the vital signs and the patient's history into a single judgement under time pressure. That judgement is unavoidably subjective, and studies report meaningful variation between raters and a tendency to drift with fatigue and workload~\cite{Ivanov2021}. The visible consequence is a measurable rate of under-triage, in which a seriously ill patient is given too low a priority and may deteriorate while waiting, and over-triage, in which scarce resources go to patients who do not need them. Both are costly, and under-triage can be dangerous.
+
+This is where machine learning (ML) becomes attractive. Every triage encounter already generates the kind of data a model can learn from, including vital signs, the chief complaint written in free text, demographic details and, often, the patient's prior records, all collected as a matter of routine rather than for research. A model trained on enough past encounters can learn the statistical relationship between this information and an outcome of interest, such as the correct acuity level, whether the patient will need admission, or whether they are at risk of deterioration. In principle this offers three things that human triage struggles to provide at scale. The first is consistency, since a model applies the same rule to every patient and does not tire. The second is speed, since a prediction is essentially instant. The third is an extra safety check, since a model can flag a high-risk patient that a rushed assessment might rate too low. In almost all of this work the goal is decision support rather than replacement, with the model offering a second opinion that the nurse remains free to override. A high-stakes, high-volume decision that already produces structured and unstructured data as a by-product is, in short, close to an ideal setting for machine learning, which is why the research community has invested in it so heavily and why hospitals, regulators and vendors are now paying attention. On a personal level the topic also sits where I want to work, at the meeting point of applied machine learning and systems that have to run in messy real-world conditions rather than on clean benchmark data. Working out where the field genuinely stands, rather than where its headline accuracy figures suggest it stands, is what this report is for.
 
 \subsection{Context of the research}
-The intersection of artificial intelligence and clinical triage has transitioned from basic rule-based systems to complex data-driven frameworks. The primary research questions driving this field focus on model generalizability, algorithmic equity, and processing heterogeneous data streams. 
 
-In real-world settings, emergency triage data is messy and multi-modal. Algorithms must successfully predict operational outcomes like immediate hospital admission from baseline triage data~\cite{Hong2018PredictingHA}, automate five-level emergency severity indices within specialized national health structures~\cite{Vantu2023}, and process unstructured clinical text or physician letters~\cite{Wang2023}. While various models consistently outperform or assist traditional human triage accuracy~\cite{Ivanov2021}, translating these computer-bound models into live, chaotic hospital environments remains a major systemic challenge plagued by issues of clinical trust and technical integration~\cite{FernandesReview}.
+Applying computation to triage is not new. Rule-based decision aids predate the modern ML era by decades. What has changed is the move from hand-written rules to data-driven models trained on large electronic health record (EHR) repositories, and more recently the addition of unstructured text and of techniques borrowed from explainable AI. The field has passed through three loosely overlapping phases. First came an early period of showing that ML could match or beat human triage on retrospective data. Then came a consolidation phase in which review papers began to map the landscape and expose its weaknesses. The current phase is concerned less with raw accuracy than with trust, fairness and the practicalities of deployment.
+
+A handful of questions recur throughout. Can a model trained at one hospital be expected to work at another, given how differently institutions record their data? Do models trained on past clinical decisions inherit the biases embedded in them? How can heterogeneous, partly missing, partly free-text triage data be turned into something a model can consume at all? And, perhaps most important for adoption, can a model explain itself well enough that a clinician will act on its output and a regulator will approve it? These map onto the questions of generalisability, fairness, data quality, and explainability that organise the rest of the report.
+
+None of this is abstract. The questions appear in concrete forms across the surveyed work: predicting whether a patient at triage will eventually be admitted~\cite{Hong2018PredictingHA}, processing heterogeneous national triage data into a usable form~\cite{Vantu2023}, predicting a patient's eventual disposition as a multi-class problem~\cite{Yoshimura2026}, reading free-text nurse notes to correct ESI assignment~\cite{Ivanov2021}, and combining structured and unstructured data in a single hybrid pipeline~\cite{Wang2023}. The tension running through all of them is that models which perform well in these retrospective studies have so far rarely been tested where it counts, which is live, in more than one hospital, on patients who were not in the training set~\cite{Fernandes, Sanchez2022}.
 
 \subsection{Aim of the report}
-The primary objective of this report is to provide a structured overview and a rigorous critical analysis of contemporary machine learning methodologies deployed for emergency room triage. Specifically, this report aims to:
-\begin{itemize}
-    \item Evaluate distinct algorithmic approaches, ranging from standard tabular classifiers to hybrid models leveraging Natural Language Processing (NLP).
-    \item Compare the operational efficacy of these models across varying clinical targets (e.g., predicting acuity versus predicting hospital admission).
-    \item Identify prevailing open bottlenecks—such as data scarcity for rare conditions, overconfidence in AI predictions~\cite{Salman2021}, and real-world deployment challenges—to highlight clear paths for future research.
-\end{itemize}
+
+The aim of this report is to give a structured and critical overview of the current state of machine learning for emergency department triage, and to use that overview to judge how close the field really is to safe clinical use. The reason for doing the comparison is that the literature is easy to misread. Individual papers report high accuracy, but from those numbers alone a reader cannot tell whether one approach is genuinely better than another, or whether any of them is ready for a real department. The figures are largely not comparable, because they come from different datasets, different definitions of the target and different evaluation protocols, and very few are accompanied by the kind of validation deployment would require. A consolidated, critical comparison is therefore needed to separate what the field has actually established from what it has merely reported, and that is the gap this report sets out to fill.
+
+In practice the report has four objectives. The first is to survey the main families of methods applied to triage, from classical structured-data classifiers through hybrid and natural-language approaches to the interpretability and fairness work that now surrounds them. The second is to compare these approaches along the criteria that actually matter, namely the clinical task they target, the data they use, the performance they report and, above all, the strength of the evidence behind that performance. The third is to identify the open problems that separate strong retrospective results from systems that could be deployed safely. The fourth is to draw from this analysis a set of concrete conditions a triage model should satisfy before clinical use, and to point to the research directions most likely to get the field there. The report is deliberately critical rather than descriptive, because a catalogue of accuracy figures would mislead, and the more useful contribution is to read the literature against the demands of real clinical use.
 
 \subsection{Structure of the report}
-The remainder of this report is organized as follows: Section 2 outlines the systematic methodology utilized to select the bibliographical sources and provides a statistical overview of the literature landscape. Section 3 (and 6) maps the current state-of-the-art by categorizing the studied papers into thematic clusters based on their core clinical focus. Section 4 offers a comparative critical analysis, highlighting the structural strengths and weaknesses of the reviewed methods against specific performance criteria. Finally, Section 5 summarizes the core insights of this survey and proposes strategic directions for further research.
 
+The rest of the report is organised as follows. Section~\ref{sec:methodology} explains how the surveyed papers were selected and gives a statistical picture of the resulting set, including its spread over time and across subtopics. Section~\ref{sec:sota} presents the state of the art, grouping the twelve papers into thematic clusters and, for each, describing the problem addressed, the methods used, the main results and the open problems the authors themselves identify. Section~\ref{sec:critical} steps back to a comparative critical analysis, examining the field against the dimensions that matter for deployment, namely clinical readiness, data quality, fairness, explainability and the surrounding legal and ethical constraints, before adding my own view of the open questions and a set of recommendations. Section~\ref{sec:conclusion} concludes and outlines directions for further work.
 
 \section{Methodology of the survey}
+\label{sec:methodology}
 
-The aim of this section is to present how have been selected the papers used in the survey of related work and to provide an image on the evolution in time of the field and distribution of papers on different subtopics. A step-by-step approach to conducting a systematic literature review is presented in \cite{Rivera2022}.
+This section describes how the reviewed papers were found and selected, and gives a short statistical picture of the result. The intention is to make the selection reproducible and to be honest about its scope: this is a focused survey of representative work rather than an exhaustive systematic review of the whole field. The procedure was nonetheless guided by the steps recommended for systematic reviews~\cite{Sanchez2022}, in that it used explicit sources, explicit search terms and explicit selection criteria.
 
 \subsection{Selection of bibliographical sources}
 
-\begin{itemize}
-\item bibliographical resources (ScienceDirect, GoogleScholar, DBLP, arxiv, ResearchGate ...)
+The search was carried out mainly through Google Scholar and Web of Science, supplemented by following citation trails from the key papers. These two databases were chosen because together they cover both the peer-reviewed clinical informatics journals, such as \emph{PLOS ONE}, \emph{Heliyon}, \emph{Artificial Intelligence in Medicine} and \emph{Nature Medicine}, and the broader biomedical engineering literature. Queries combined a term for the clinical setting with a term for the technique, using Boolean operators, for example ``emergency department'' together with ``machine learning'' and ``triage'', ``triage'' together with ``predictive model'' or ``classification'', ``clinical decision support'' together with ``triage'', and ``natural language processing'' together with ``nurse notes''. A further pass paired ``explainability'' or ``fairness'' with ``clinical machine learning'' to capture the more recent strand of work.
 
-\item search keywords
-
-\item inclusion and exclusion criteria (based on the relevance to the aim of the report, the publication year, the impact of the paper and of the publication) 
-\end{itemize}
-
-During the selection of the papers criteria related to the contents might be also taken into account \cite{Rivera2022}:
-
-\begin{itemize}
-\item does the paper present clearly the objectives/ research questions?
-\item is the addressed problem described clearly and rigorously?
-\item is the used methodology clearly presented?
-\item are the results clearly presented? are the results reproducible?
-\item are the limitations of the approach presented? 
-\end{itemize}
+Candidate papers were then filtered on four criteria. Relevance came first: a paper had to address triage, acuity assignment, admission or disposition prediction, or a directly enabling concern such as data preprocessing, explainability or fairness, while general hospital scheduling and unrelated clinical prediction tasks were excluded. Evidence and impact came next, with preference given to peer-reviewed work in recognised venues so that the survey reflects literature the community itself treats as significant. Temporal coverage was the third criterion: recent work from 2021 onward was prioritised to capture the current state of the art, while a small number of older, foundational papers from 2017 and 2018 were kept deliberately to trace how the field developed. Methodological clarity was the last, following the content-quality questions recommended for reviews~\cite{Sanchez2022}, so that each retained paper states its research question, describes its data and method, reports evaluation metrics and discusses its own limitations. Applying these criteria left the twelve papers analysed here. The number is modest on purpose, since the aim is depth on a representative cross-section rather than breadth, and several of the included reviews~\cite{Salman2021, Sanchez2022, Fernandes, Antoniadi} themselves aggregate dozens of primary studies, so the effective coverage is considerably wider than twelve.
 
 \subsection{Statistical overview on selected papers}
 
-\begin{itemize}
-\item (graphical) illustration of the evolution of the field (e.g. through the number of publications)
+The selected papers span a decade, from 2017 to 2026, and their distribution over that period mirrors the broader acceleration of machine learning in healthcare, with most of the set concentrated from 2021 onward and only a small foundational tail in 2017 and 2018. Figure~\ref{fig:years} shows this distribution; the chart itself will be generated once the paper set is final.
 
-\item (graphical) illustration of the distribution of papers per (sub)topics or other categories
-\end{itemize}
-
-\section{Methodology of the survey}
-
-The aim of this section is to present the systematic framework used to identify, select, and evaluate the papers compiled for this survey on machine learning applications in emergency triage. To ensure rigor and reproducibility, a step-by-step approach inspired by systematic literature reviews~\cite{Rivera2022} was adopted, tracking the evolution of the field over a multi-year horizon.
-
-\subsection{Selection of bibliographical sources}
-
-The literature search was primarily executed using two comprehensive academic databases: \textbf{Google Scholar} and \textbf{Web of Science}. These platforms were selected to ensure a balanced coverage of both broad biomedical engineering preprints and high-impact, peer-reviewed clinical informatics journals.
-
-The search strategy employed combinations of the following core keywords and Boolean operators:
-\begin{itemize}
-    \item \texttt{"medical triage" AND "machine learning"}
-    \item \texttt{"emergency department" AND "predictive modeling"}
-    \item \texttt{"clinical decision support" AND "patient prioritization"}
-    \item \texttt{"natural language processing" AND "triage notes"}
-\end{itemize}
-
-To filter the initial search results, specific \textbf{inclusion and exclusion criteria} were applied:
-\begin{enumerate}
-    \item \textbf{Relevance:} Papers had to directly address the optimization of emergency room patient flows or acuity assignments using algorithmic/computing solutions. General healthcare scheduling papers were excluded.
-    \item \textbf{Impact and Quality:} Papers were sorted by citation count from high to low within their respective publication years to prioritize highly-regarded, foundational literature.
-    \item \textbf{Temporal Evolution:} While the search heavily prioritized "fresh" and recent literature (2020--2023) to capture state-of-the-art architectures, older baseline papers dating back to 2017--2018 were intentionally included to trace the historical progression from simple classifiers to deep learning paradigms.
-\end{enumerate}
-
-During the final screening of the 8 selected papers, content-specific quality criteria~\cite{Rivera2022} were enforced. Each paper was evaluated on whether it clearly defined its clinical research questions, rigorously described its underlying data preprocessing pipeline, provided reproducible evaluation metrics (such as AUC-ROC or accuracy scales), and transparently discussed model limitations regarding live deployment.
-
-\subsection{Statistical overview on selected papers}
-
-The final cohort consists of 8 carefully chosen papers that reflect the shifting trends in the domain. A chronological analysis of the selection shows a distinct concentration of research output in recent years, mirroring the exponential growth of AI in healthcare. 
-
-The distribution of the selected literature across the timeline is as follows:
-\begin{itemize}
-    \item \textbf{Foundational Background (2017--2018):} 2 papers~\cite{Dragan, Hong2018PredictingHA} capturing early clinical infrastructure problems and foundational machine learning validation on tabular emergency data.
-    \item \textbf{Consolidation Phase (2020--2021):} 3 papers~\cite{FernandesReview, Salman2021, Ivanov2021} focused on systematic meta-reviews and the integration of text-based clinical notes.
-    \item \textbf{Modern State-of-the-Art (2022--2023):} 3 papers~\cite{Sanchez2022, Vantu2023, Wang2023} exploring deep neural networks, localized national clinical triage frameworks, and heterogeneous hybrid data types.
-\end{itemize}
-
-Furthermore, the papers can be categorized by their primary methodological subtopic, showcasing how research has branched out over time:
-
-\begin{table}[ht]
+\begin{figure}[H]
 \centering
-\caption{Thematic Distribution of Selected Survey Papers}
-\label{tab:thematic_distribution}
-\begin{tabular}{|l|c|l|}
-\hline
-\textbf{Subtopic / Category} & \textbf{Count} & \textbf{References} \\ \hline
-General Reviews and Overcrowding & 4 & Salman et al.~\cite{Salman2021}, Sánchez-Salmerón et al.~\cite{Sanchez2022}, \\ 
- & & Fernandes et al.~\cite{FernandesReview}, Drăgan et al.~\cite{Dragan} \\ \hline
-Testing Models on Real Data & 2 & Hong et al.~\cite{Hong2018PredictingHA}, Vântu et al.~\cite{Vantu2023} \\ \hline
-Using AI to Read Doctor Notes (NLP) & 2 & Wang et al.~\cite{Wang2023}, Ivanov et al.~\cite{Ivanov2021} \\ \hline
+\figplaceholder{Number of selected papers per publication year (2017--2026). Bar chart, to be generated.}
+\caption{Temporal distribution of the surveyed papers, concentrated in recent years with a small foundational tail.}
+\label{fig:years}
+\end{figure}
+
+The papers can also be grouped by their main methodological focus. Five clusters emerged and structure the survey in Section~\ref{sec:sota}: the overcrowding problem that motivates the field, classical machine learning on structured data, hybrid and natural language processing (NLP) approaches, reviews and systematic surveys, and the cross-cutting concerns of explainability, fairness and trust. Figure~\ref{fig:topics} shows how the papers fall across these clusters, and Table~\ref{tab:thematic} lists them.
+
+\begin{figure}[H]
+\centering
+\figplaceholder{Distribution of papers across the five thematic clusters. Bar or pie chart, to be generated.}
+\caption{Distribution of the surveyed papers across thematic clusters.}
+\label{fig:topics}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Thematic distribution of the surveyed papers.}
+\label{tab:thematic}
+\begin{tabular}{p{6.5cm} c p{5cm}}
+\toprule
+\textbf{Thematic cluster} & \textbf{Count} & \textbf{References} \\
+\midrule
+Overcrowding and the case for decision support & 1 & \cite{Dragan} \\
+Classical ML on structured data & 3 & \cite{Hong2018PredictingHA, Vantu2023, Yoshimura2026} \\
+Hybrid and NLP-based approaches & 2 & \cite{Wang2023, Ivanov2021} \\
+Reviews and systematic surveys & 3 & \cite{Salman2021, Sanchez2022, Fernandes} \\
+Explainability, fairness and trust & 3 & \cite{Antoniadi, Liu2025, SeyyedKalantari2021} \\
+\bottomrule
 \end{tabular}
 \end{table}
 
-This thematic breakdown highlights that while half of the current literature focuses on summarizing operational hurdles or mapping general trends, the other half is actively splitting between structured electronic health record (EHR) analytics and advanced free-text processing architectures.
+The breakdown is itself informative. Roughly a quarter of the set consists of reviews, which suggests a field mature enough to reflect on itself but still looking for consensus. Another large share is now devoted not to building more accurate models but to making existing ones trustworthy and fair, which is a sign of a field moving from proof of concept toward deployment.
 
 \section{State of the art in the field}
+\label{sec:sota}
 
-For each paper (group of papers) the following questions should be answered:
-\begin{itemize}
-\item which is the addressed problem (research question(s))
+This section presents the surveyed work in detail, grouped into the five clusters introduced above. For each paper the discussion covers the problem addressed, the methods used, the main results and the open problems the authors identify, but in continuous prose rather than under fixed headings. Where reported figures appear they are taken from the papers themselves, and where a study does not report a clean headline figure none is invented, since the studies are not directly comparable in any case.
 
-\item which are the methods which have been used/ proposed 
+\subsection{The overcrowding problem and the case for decision support}
 
-\item which are the main results
+The starting point for much of this literature is the problem machine learning is meant to solve. Drăgan and colleagues~\cite{Dragan} step back from algorithms to ask why emergency departments become overcrowded in the first place, and what can be done about it, treating overcrowding as a systemic rather than a purely clinical problem. They examine its structural causes and review the technological and workflow countermeasures available, from electronic patient tracking to process-optimisation infrastructure, and conclude that these can move patients through the department faster but cannot, on their own, solve overcrowding. Gains made at the entrance are easily cancelled by bottlenecks further along, most obviously by boarding, where admitted patients stay in the department because no inpatient bed is free. The lesson they draw is organisational rather than algorithmic, and it usefully bounds what any triage model can achieve: even a perfect classifier cannot fix a department whose real constraint is bed capacity.
 
-\item if there are open problems (specified by the authors)
-\end{itemize}
+\subsection{Classical machine learning on structured data}
 
-\section{State of the art in the field}
+The most established line of work trains standard classifiers on structured triage and EHR fields. Hong, Haimovich and Taylor~\cite{Hong2018PredictingHA} asked whether hospital admission could be predicted at the moment of triage, so that beds and resources could be planned ahead of time. They trained logistic regression, random forests and gradient-boosted trees on records from three emergency departments within one academic health system, drawing on more than half a million visits and, importantly, on each patient's prior medical history rather than triage data alone. Their best model reached an area under the ROC curve (AUC) of about 0.87, and most of that performance came from the historical variables. The work showed early that admission prediction is tractable for structured-data machine learning. Its main limitation recurs throughout this survey: the study was retrospective and confined to a single health system, so it does not establish that the model would transfer to hospitals that record their data differently. The authors also left out free-text clinician notes, discarding a source of signal that later hybrid work would try to recover.
 
-This section explores the current landscape of machine learning (ML) architectures deployed to optimize patient stratification and flow within Emergency Departments (ED). To provide a cohesive overview, the analyzed literature is categorized into three distinct thematic subtopics: general meta-reviews dealing with operational bottlenecks, localized empirical models validated on real-world clinical datasets, and advanced implementations utilizing Natural Language Processing (NLP) to parse clinical text.
+Vântu, Vasilescu and Băicoianu~\cite{Vantu2023} concentrate on a less glamorous but decisive part of the problem, which is turning messy, partly missing Romanian triage records into data a model can actually use. Their emphasis is on the pipeline rather than on any single exotic model. They design preprocessing procedures for mixed data types, apply targeted imputation to fill gaps and train standard classifiers on the cleaned result. Careful preprocessing measurably improves how cleanly the acuity classes separate, which supports their wider point that in this domain data engineering can matter as much as the choice of algorithm. What stays unsolved is the move from a cleaned, static dataset to a live one. A pipeline that works offline is not the same as one kept in step with a continuously updating record, and the imbalance around rare but critical cases remains hard to handle.
 
-\subsection{General Reviews and Overcrowding}
+Yoshimura and Moriguchi~\cite{Yoshimura2026} push the target further. Rather than the binary admit-or-discharge question, they predict a patient's eventual disposition as a multi-class problem using only the information available at triage, and they measure how much is gained by adding data that arrives later. Framing the task this way is more realistic, since early decisions often have to be made before laboratory or imaging results are back. Their results show that structured-data models extend to this richer question, but they also sharpen the recurring weakness of these methods: performance falls on the rare, high-acuity outcomes that matter most, simply because there are so few examples to learn from.
 
-\noindent \textbf{Salman et al. (2021) \cite{Salman2021}} \\
-The authors address the challenge of validating whether machine learning framework architectures can be safely and effectively utilized for remote telemedicine and frontline patient triage. Through a comprehensive meta-analysis of contemporary literature, the study evaluates various classification models. The results demonstrate that ML-driven triage consistently yields superior classification accuracy and speed compared to traditional, manual paper-based triage protocols. However, a significant open problem identified by the authors is the tendency of modern AI systems to exhibit high algorithmic overconfidence, occasionally delivering incorrect clinical classifications with high statistical certainty.
+\subsection{Hybrid and NLP-based approaches}
 
-\vspace{0.3cm}
-\noindent \textbf{Sánchez-Salmerón et al. (2022) \cite{Sanchez2022}} \\
-This study focuses on benchmarking the diverse array of machine learning algorithms currently integrated into emergency medical services. By synthesizing data from multiple international deployment frameworks, the review highlights that predictive models drastically reduce the time required to isolate high-acuity, critically ill patients from low-risk cases. Despite these efficiency gains, the authors point out a persistent open problem: extreme dataset heterogeneity across different hospital networks makes it exceptionally difficult to train or establish a universally generalizable, "one-size-fits-all" clinical model.
+A second line of work brings in the free-text narrative that the structured models discard. Wang and colleagues~\cite{Wang2023} ask whether using both structured fields and clinical text does better, in the setting of referrals from primary into secondary care rather than the emergency department itself. Their hybrid framework combines structured referral data with the text of referral letters, using natural language processing to extract signal from the prose, and reaches an AUC of about 0.90 in separating inflammatory from non-inflammatory cases at the point of triage. Unusually for this literature, the model was piloted in a live trial at a large UK hospital, where it matched or slightly exceeded clinicians and was estimated to save around eight hours of assessment time per week. The price of relying on free text is portability, since documentation styles, abbreviations and local terminology vary so much between institutions that a model tuned to one site's letters may not survive transfer to another's.
 
-\vspace{0.3cm}
-\noindent \textbf{Fernandes et al. (2020) \cite{FernandesReview}} \\
-This review investigates the systemic barriers preventing the widespread clinical adoption of AI-driven Clinical Decision Support Systems (CDSS) in modern hospitals. The methodology involves a rigorous evaluation of operational clinical outcomes across several pilot programs. The findings reveal that while these systems reliably minimize overall patient length-of-stay, the vast majority of existing research is restricted to \textit{in-silico} computer simulations rather than live, prospective tracking. Consequently, the primary open problem is the lack of extensive validation within chaotic, real-world clinical environments.
+Ivanov and colleagues~\cite{Ivanov2021} stay inside the emergency department and target the accuracy of ESI acuity assignment directly. Their system applies machine learning and clinical natural language processing to historical records, including the free-text nurse note, and was developed on roughly 166{,}000 encounters from two hospitals. It assigned the correct ESI level about 75.7\% of the time, against 59.8\% for the triage nurses on the same cases, and it did so without being swayed by the contextual pressures that often push human triage toward error. The catch is that the model is only as good as what is charted. When vital signs or notes are missing or entered incorrectly its input is corrupted and its advantage erodes, which in a hurried department is a real risk.
 
-\vspace{0.3cm}
-\noindent \textbf{Drăgan et al. (2017) \cite{Dragan}} \\
-The core objective of this research is to analyze the root causes and technological countermeasures associated with severe emergency department overcrowding. The authors evaluate structural workflow interventions and electronic tracking infrastructures. The results indicate that while technical optimization packages successfully accelerate patient throughput, technology alone is insufficient. A critical open problem remains: underlying deficiencies in hospital administrative management and boarding blockages can completely nullify the operational speed advantages introduced by automated triage algorithms.
+\subsection{Reviews and systematic surveys}
 
-\subsection{Testing Models on Real Data}
+Three broad reviews map the territory. Salman and colleagues~\cite{Salman2021} survey how machine learning has been used across electronic emergency triage and patient-priority systems, including in telemedicine, drawing on a large body of primary work. Across that literature, machine learning consistently beats manual, paper-based triage on both accuracy and speed, and ensemble tree methods dominate the processing of structured data. Those same methods, however, degrade on the most imbalanced acuity levels and tend to underestimate the rare, resuscitation-level cases. The danger the review keeps returning to is overconfidence: a model that delivers a wrong classification with high apparent certainty is especially hazardous in a setting where a confident recommendation may go unquestioned.
 
-\noindent \textbf{Hong et al. (2018) \cite{Hong2018PredictingHA}} \\
-The authors address the problem of predicting whether an incoming patient will ultimately require hospital admission or can be safely discharged, directly at the initial point of ED triage. The methodology leverages large-scale electronic health record (EHR) datasets to train standard machine learning classifiers, such as gradient-boosted trees and logistic regression. The experimental results show high predictive accuracy, achieving an AUC-ROC of approximately 92\%, driven primarily by deep integration of the patient's historical medical records. However, the study leaves open the problem of external validation, as the models require rigorous testing across disparate hospital settings with varying data architectures.
+Sánchez-Salmerón and colleagues~\cite{Sanchez2022} take a more systematic approach, cataloguing the algorithms and the evaluation practices across a defined set of studies. Random forests and support vector machines turn out to be the most common choices, and machine learning on triage data predicts outcomes such as mortality and the need for hospitalisation more accurately than conventional scales like the ESI. The more important observation is methodological. External validation is rare and most studies lean on data from a single centre, so individual accuracy figures cannot be trusted to generalise. The field, they argue, is more interested in accuracy than in what it would take to deploy these models, a diagnosis that shapes the critical analysis below.
 
-\vspace{0.3cm}
-\noindent \textbf{Vântu et al. (2023) \cite{Vantu2023}} \\
-This empirical study addresses the challenge of automatically sorting patients into localized, five-level emergency severity indices within the specific framework of the Romanian healthcare system. The authors propose and train deep neural network (DNN) architectures using regional, real-world triage data streams. The results demonstrate that neural networks are highly adept at identifying complex, high-risk clinical presentations that traditional linear scoring models overlook. Nonetheless, an ongoing open problem is the extreme data scarcity and class imbalance surrounding very rare, but highly critical medical emergencies, which complicates robust algorithmic training.
+Fernandes and colleagues~\cite{Fernandes} ask why clinical decision support systems for triage, despite years of encouraging results, are still so rarely used in practice. Reviewing the deployed systems, they separate those that advise a clinician from those that would replace manual assessment, and find that almost all are advisory, held back by regulatory and liability concerns and by a lack of explainability. The benefits reported, such as shorter length of stay, come mostly from simulation rather than live use, so the central gap is the scarcity of validation in real, busy clinical settings.
 
-\subsection{Using AI to Read Doctor Notes}
+\subsection{Explainability, fairness and clinician trust}
 
-\noindent \textbf{Wang et al. (2023) \cite{Wang2023}} \\
-This research addresses the inefficiencies involved in transitioning complex patients from primary care physicians to specialized emergency departments. The authors develop a data-driven hybrid machine learning model that pairs tabular clinical metrics (such as blood panels) with Natural Language Processing (NLP) to read unstructured referral letters. The deployment results prove highly impactful, saving clinical staff an average of 8 hours of administrative data synthesis per week. However, the open problem identified is the erratic nature of free-text doctor notes, which are frequently messy, highly abbreviated, or plagued by missing operational information.
+The newest strand of work is less concerned with making models more accurate than with making them usable and fair. Antoniadi and colleagues~\cite{Antoniadi} review explainable AI in clinical decision support and find that post-hoc explanation methods such as SHAP and LIME can open up an otherwise opaque model, but at a cost. They add computation and, more seriously, do not guarantee that the explanation faithfully reflects how the model actually decided. An explanation that looks convincing but is not faithful can give false confidence, which in a clinical setting is its own hazard, so explainability is better understood as an open requirement than as a solved feature.
 
-\vspace{0.3cm}
-\noindent \textbf{Ivanov et al. (2021) \cite{Ivanov2021}} \\
-The study investigates whether NLP-driven algorithms can assign Emergency Severity Index (ESI) acuity levels with higher reliability than human triage staff. The authors utilize text-mining models trained directly on raw, unstructured nurse intake notes. The findings reveal that the automated NLP framework achieved an overall accuracy rate of 76\%, notably outperforming the human nurse baseline accuracy of 60\% under equivalent conditions. Despite this performance gap, a major open problem centers on clinical trust and interpretability; finding ways to make black-box text models transparent enough for medical practitioners to confidently adopt in high-stakes environments remains a hurdle.
+Liu and colleagues~\cite{Liu2025} push back against the assumption that the best models must be black boxes. Working on intensive-care triage with a large critical-care database, they develop and validate models that are interpretable from the outset rather than explained after the fact, and show that interpretability and strong predictive performance can coexist. Validation across sites and over time remains the constraint, as ever, but the result weakens the usual claim that opacity is the price of accuracy.
+
+Seyyed-Kalantari and colleagues~\cite{SeyyedKalantari2021} supply the cautionary case. Studying classifiers trained on chest radiographs, they show that state-of-the-art models systematically underdiagnose under-served groups, with the highest error rates falling on intersectional subpopulations such as Hispanic women, because those groups are under-represented in the training data. The study is about imaging rather than triage, but the mechanism carries over directly. Any model trained on records of past clinical decisions can inherit the biases in them, and a triage model built without attention to this risks not just reproducing a historical disparity but applying it automatically and at scale, which is harder to see and easier to trust than individual human bias.
+
 \section{Critical analysis}
-\begin{itemize}
-\item presentation of the comparative criteria between the approaches presented in different papers (e.g. complexity of the algorithms/models, performance of the models etc)
-\item comparative analysis (wrt selected criteria) including advantages and disadvantages (strong and weak points)
-\item comments/remarks related to different aspects of the methods/studies
-\item open problems/unanswered questions (from your perspective)
+\label{sec:critical}
 
-\end{itemize}
+The previous section described what each paper does. This section reads the field as a whole against the requirements of safe clinical use. The organising observation is simple but, I think, decisive. The surveyed work reports strong predictive performance almost everywhere, yet almost none of it provides the kind of evidence that would justify putting a model into a real emergency department. What follows works through the criteria along which the approaches can be compared, and then through the structural barriers that the headline accuracy figures tend to hide.
 
-{\it Remarks.} 
-\begin{itemize}
-\item it would be useful to summarize the comparative analysis (or the review) in a table where the specific elements of each approach are mentioned
-\item the critical analysis can be incorporated in the previous section.
-\end{itemize}
+\subsection{Comparative criteria}
 
+Comparing triage models is harder than it first appears, because the headline numbers do not measure the same thing. A meaningful comparison has to hold several dimensions in view at once. The clinical task is the first of them, since admission prediction~\cite{Hong2018PredictingHA}, multi-class disposition~\cite{Yoshimura2026}, ESI acuity assignment~\cite{Vantu2023, Ivanov2021} and referral triage~\cite{Wang2023} are genuinely different problems with different difficulties and different costs of error; an AUC of 0.87 on a binary admission task is not comparable to accuracy on a five-class acuity task. The data modality is the second, since structured-only models~\cite{Hong2018PredictingHA, Vantu2023, Yoshimura2026} are simpler and more portable but discard the clinical narrative, whereas hybrid and NLP models~\cite{Wang2023, Ivanov2021} recover that signal at the cost of fragility to differences in documentation. Reported performance is the third, useful as a sanity check but only within a single study, given that the metric, the dataset and the target all differ across papers. The fourth dimension, and the one that actually matters for deployment, is the strength of the evidence, meaning whether a result rests on single-centre retrospective cross-validation or on prospective, external, multi-site validation. Table~\ref{tab:comparison} summarises a representative subset of the primary studies along these lines, and the pattern it makes visible is that strong metrics and weak evidence tend to go together.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of representative primary ML studies on triage.}
+\label{tab:comparison}
+\begin{tabular}{c p{3cm} p{2.7cm} p{2.8cm} p{2.8cm}}
+\toprule
+\textbf{Study} & \textbf{Method} & \textbf{Data} & \textbf{Task} & \textbf{Reported result} \\
+\midrule
+\cite{Hong2018PredictingHA} & LR, RF, GBM & One health system, 3 EDs & Admission prediction & AUC $\approx$ 0.87 \\
+\cite{Wang2023} & Hybrid ML + NLP & UK secondary care referrals & Referral triage & AUC $\approx$ 0.90; live pilot \\
+\cite{Ivanov2021} & ML + clinical NLP & Two hospitals & ESI assignment & 75.7\% vs 59.8\% (nurses) \\
+\cite{Vantu2023} & Preprocessing + classifiers & Romanian ED & Acuity grouping & improved class separation \\
+\cite{Yoshimura2026} & Multi-class ML & Single-centre ED & Disposition prediction & no single headline metric \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Performance versus clinical readiness}
+
+The clearest single finding of this survey is the gap between reported performance and clinical readiness. Models are routinely trained and evaluated on historical data from one institution using cross-validation, a protocol that cannot capture the distribution shift that occurs between hospitals, between patient populations or simply over time~\cite{Sanchez2022, Fernandes}. A model that scores well under cross-validation has shown that it can fit the institution it was trained on, not that it will work anywhere else, and the reviews that aggregate this literature say as much~\cite{Salman2021, Sanchez2022}. My own view is that no triage model should be treated as clinically ready without, at the very least, prospective validation in a live department and external validation across two or more independent sites with different patient populations. Almost none of the surveyed primary studies clear that bar, the partial exception being the live pilot reported by Wang and colleagues~\cite{Wang2023}, which is also why it stands out.
+
+\subsection{Data quality and standardisation}
+
+Underneath the modelling sits a less glamorous but equally decisive problem, which is the data. Triage records contain missing values, free text of variable quality and institution-specific coding conventions that block direct model transfer~\cite{Vantu2023, Wang2023}. Vântu and colleagues~\cite{Vantu2023} show how much careful preprocessing and imputation can recover, which is encouraging, but it also shows how much of any reported result depends on data engineering specific to one dataset. Compounding this, there is no shared benchmark dataset for triage machine learning. Every study evaluates on its own data, so cross-study comparison is unreliable and progress is hard to measure objectively. A shared, longitudinal, multi-institution dataset that captured raw vitals, chief complaints, free text and downstream outcomes would do more for the field than another incremental model.
+
+\subsection{Algorithmic bias and fairness}
+
+Because triage datasets are records of past human decisions, they carry the biases of those decisions. Seyyed-Kalantari and colleagues~\cite{SeyyedKalantari2021} demonstrate, in medical imaging, that AI can underdiagnose marginalised groups precisely because those groups are under-represented in the data, and there is no reason the same mechanism would spare triage. A triage model trained without attention to this can turn a historical disparity into an automated one, applied uniformly and at scale, which is arguably worse than the human bias it replaces because it is harder to see and easier to trust. Auditing model performance across demographic subgroups, both before deployment and at intervals afterwards, should therefore be a standard part of the pipeline rather than an afterthought, and very little of the surveyed primary work does it.
+
+\subsection{Explainability and clinician trust}
+
+A model that cannot explain itself will not be used, and increasingly will not be approved. Clinicians are reasonably unwilling to act on a recommendation they cannot interrogate, especially in a high-stakes setting, and reviews of clinical decision support adoption identify the lack of explainability as a primary barrier~\cite{Fernandes, Antoniadi}. Post-hoc methods such as SHAP and LIME offer partial relief, but Antoniadi and colleagues~\cite{Antoniadi} caution that they add overhead and do not guarantee faithfulness to the model, so an explanation can mislead. The more promising path is the one Liu and colleagues~\cite{Liu2025} take, which is to build models that are interpretable by design and to show that this need not cost accuracy. There is also a converse risk worth naming, namely automation bias, in which clinicians over-trust a confident-looking output~\cite{Salman2021}, so the goal is calibrated trust rather than maximal trust.
+
+\subsection{Legal, social, ethical and professional considerations}
+
+Deployment does not happen in a vacuum. In the European Union, any system using patient data must comply with the General Data Protection Regulation, and medical software meant to influence clinical decisions is likely to fall under the EU Medical Device Regulation and to be treated as high-risk under the EU AI Act, all of which require formal conformity assessment before use. Ethically, automated triage raises hard questions of accountability, since if a model under-triages a patient who then deteriorates, responsibility has to be assigned among the clinician, the institution and the developer, and the current literature offers no consensus on how. Socially, the fairness problem discussed above is a direct threat to equitable access to emergency care. Professionally, clinicians have to be trained to weigh ML recommendations critically and to resist automation bias. These constraints are not separate from the technical work, since they shape what can be built, and engaging with the relevant regulators early in the design cycle is more sensible than treating compliance as a final hurdle.
+
+\subsection{Open problems}
+
+Pulling these threads together, the open problems I consider most important are, roughly in order, the following. The validation gap comes first, because the field needs prospective, multi-site evaluation far more than it needs higher cross-validation scores. The absence of a shared benchmark comes next, since without one objective progress cannot really be measured. Fairness follows, under-addressed in the primary literature despite clear evidence of harm. Faithful, ideally built-in explainability comes after that, in preference to post-hoc explanation whose fidelity is uncertain. Robustness to the messy, missing, real-time data that any deployed system will face rounds out the list. These problems are not independent. A shared benchmark would make both validation and fairness auditing far more tractable, which is part of why I rank it so highly.
+
+\subsection{Recommendations}
+\label{sec:recommendations}
+
+The point of this analysis is not only to diagnose the field's weaknesses but to say what would address them, so it is worth stating plainly the conditions a triage model should meet before it is used in a real department. The first and most important is prospective, multi-centre validation: a model should be evaluated on live, prospectively collected data from at least two institutions with different patient populations, rather than on a single-centre retrospective split, and this is the condition almost no surveyed study currently meets~\cite{Sanchez2022, Fernandes}. The second is standardised benchmarking, meaning a shared, longitudinal dataset established under a sound data-governance framework, so that competing models can be compared on equal terms and progress can be measured~\cite{Vantu2023}. The third is faithful explainability, preferably through models that are interpretable by design~\cite{Liu2025} rather than post-hoc explanations whose faithfulness is not guaranteed~\cite{Antoniadi}. The fourth is routine fairness auditing across demographic subgroups, before deployment and periodically afterwards, to avoid reproducing the disparities documented in the data~\cite{SeyyedKalantari2021}. The fifth is early regulatory engagement, since planning for the General Data Protection Regulation, the EU Medical Device Regulation and the EU AI Act from the start of the design cycle is more realistic than treating compliance as a final hurdle. Taken together these describe a workable path from the current state, which is strong numbers on retrospective data, to systems that could be trusted at the bedside.
 
 \section{Conclusions and further work}
+\label{sec:conclusion}
 
-\begin{itemize}
-\item a short summary of the methods/results covered in the studied papers
-\item directions for further research
-\end{itemize}
+This report has surveyed twelve representative papers on machine learning for emergency department triage, from foundational work on overcrowding and admission prediction through to recent work on disposition prediction, hybrid text-and-data models and the explainability and fairness of clinical AI. The methods are varied and the reported results are, on their own terms, consistently strong, with admission prediction around an AUC of 0.87~\cite{Hong2018PredictingHA}, a hybrid referral-triage model around an AUC of 0.90 with a live pilot~\cite{Wang2023}, and an ESI model assigning acuity more accurately than triage nurses, at roughly 75.7\% against 59.8\%~\cite{Ivanov2021}.
 
-\section{State of the art in the field}
+The more important conclusion is not about accuracy but about evidence. Across the field, strong retrospective performance sits alongside a near-total absence of the prospective, external, multi-site validation that safe deployment would require~\cite{Sanchez2022, Fernandes}. On top of this are unresolved problems of data quality and standardisation, demonstrated risks of algorithmic bias against under-represented groups~\cite{SeyyedKalantari2021}, an explainability requirement that post-hoc methods only partly satisfy~\cite{Antoniadi}, and a demanding legal and regulatory environment. The headline numbers describe what these models can do on the data they were trained on, not what they can be trusted to do in a real department.
 
-This section looks at how machine learning (ML) is used to sort patients in emergency rooms (ER). I have grouped the 8 papers into three main types.
+Several directions for further work follow from this. The most pressing is a shared, longitudinal, multi-institution benchmark dataset under a sound data-governance framework, which would make reproducible comparison and fairness auditing possible for the first time. Federated learning is a promising route to it, since it would allow models to be trained across many hospitals without moving sensitive patient data between them, addressing the generalisability and data-governance problems together. Beyond that, the field should make prospective multi-centre validation the expected standard rather than the exception, adopt interpretable models where Liu and colleagues~\cite{Liu2025} show this is feasible, build fairness auditing into the development process, and engage regulators early under the EU AI Act and the Medical Device Regulation. If these conditions are met, machine learning has real potential to improve triage accuracy and ease the load on emergency staff. Until they are, the distance between the literature's promise and clinical reality will remain.
 
-\subsection{General Reviews and Overcrowding}
-
-\begin{itemize}
-    \item \textbf{Salman et al. (2021) \cite{Salman2021}}
-    \begin{itemize}
-        \item \textbf{Problem:} Checking if ML works well for sorting patients in remote medicine.
-        \item \textbf{Results:} ML is more accurate than old paper-based methods.
-        \item \textbf{Open Problem:} AI can sometimes be too "confident" even when it is wrong.
-    \end{itemize}
-
-    \item \textbf{Sánchez-Salmerón et al. (2022) \cite{Sanchez2022}}
-    \begin{itemize}
-        \item \textbf{Problem:} Comparing different AI models used in emergency services.
-        \item \textbf{Results:} AI helps find the sickest patients much faster.
-        \item \textbf{Open Problem:} Different hospitals use different data, making it hard to find one "best" model.
-    \end{itemize}
-
-    \item \textbf{Fernandes et al. (2020) \cite{FernandesReview}}
-    \begin{itemize}
-        \item \textbf{Problem:} Why aren't more hospitals using these AI systems yet?
-        \item \textbf{Results:} AI reduces the time patients wait, but many studies are only done on computers, not with real patients.
-        \item \textbf{Open Problem:} Most AI systems are not tested in real-life busy hospitals.
-    \end{itemize}
-
-    \item \textbf{Drăgan et al. (2017) \cite{Dragan}}
-    \begin{itemize}
-        \item \textbf{Problem:} How to fix emergency room overcrowding.
-        \item \textbf{Results:} Tech solutions help move patients through the hospital faster.
-        \item \textbf{Open Problem:} Bad hospital management can ruin the benefits of fast AI triage.
-    \end{itemize}
-\end{itemize}
-
-\subsection{Testing Models on Real Data}
-
-\begin{itemize}
-    \item \textbf{Hong et al. (2018) \cite{Hong2018PredictingHA}}
-    \begin{itemize}
-        \item \textbf{Problem:} Predicting if a patient will need to stay in the hospital or go home.
-        \item \textbf{Results:} Models are very accurate (92\%) if they look at the patient's medical history.
-        \item \textbf{Open Problem:} Need to test if this works in different types of hospitals.
-    \end{itemize}
-
-    \item \textbf{Vântu et al. (2023) \cite{Vantu2023}}
-    \begin{itemize}
-        \item \textbf{Problem:} Sorting patients into 5 levels of emergency in Romania.
-        \item \textbf{Results:} Neural networks worked best for identifying serious cases.
-        \item \textbf{Open Problem:} Hard to train AI for very rare but very serious emergencies.
-    \end{itemize}
-\end{itemize}
-
-\subsection{Using AI to Read Doctor Notes}
-
-\begin{itemize}
-    \item \textbf{Wang et al. (2023) \cite{Wang2023}}
-    \begin{itemize}
-        \item \textbf{Problem:} Moving patients from a family doctor to a specialist.
-        \item \textbf{Results:} The AI "read" doctor letters and blood tests to save doctors 8 hours of work per week.
-        \item \textbf{Open Problem:} Doctor letters are often messy or missing info.
-    \end{itemize}
-
-    \item \textbf{Ivanov et al. (2021) \cite{Ivanov2021}}
-    \begin{itemize}
-        \item \textbf{Problem:} Can AI pick the right emergency level better than a person?
-        \item \textbf{Results:} The AI was 76\% accurate, while human nurses were 60\% accurate.
-        \item \textbf{Open Problem:} Making sure doctors actually trust the AI enough to use it.
-    \end{itemize}
-\end{itemize}
-
+% References are listed in order of first appearance in the text (Vancouver / IEEE style).
 \begin{thebibliography}{99}
 
-\bibitem{Hong2018PredictingHA}
-W. S. Hong, A. D. Haimovich, and R. A. Taylor, ``Predicting hospital admission at emergency department triage using machine learning'', \emph{PLoS ONE}, 2018.
-
-\bibitem{Salman2021}
-O. H. Salman et al., ``A review on utilizing machine learning technology in triage...'', \emph{Comp. Methods and Prog. in Biomedicine}, 2021.
-
-\bibitem{Sanchez2022}
-R. Sánchez-Salmerón et al., ``Machine learning methods applied to triage: A review'', \emph{Int. Emergency Nursing}, 2022.
-
-\bibitem{FernandesReview}
-M. Fernandes et al., ``Clinical Decision Support Systems for Triage: a Review'', \emph{AI in Medicine}, 2020.
-
 \bibitem{Dragan}
-I. Drăgan et al., ``A Look Into Emergency Department Overcrowding'', \emph{E-Health and Bioengineering Conference}, 2017.
-
-\bibitem{Vantu2023}
-A. Vântu, A. Vasilescu, and A. Băicoianu, ``Medical emergency department triage data processing...'', \emph{Heliyon}, 2023.
-
-\bibitem{Wang2023}
-B. Wang et al., ``Improving triaging using heterogeneous data-driven hybrid machine learning'', \emph{Decision Support Systems}, 2023.
+I. Drăgan et al., ``A look into Emergency Department overcrowding: Ideas and overview,'' in \emph{Proc. 6th IEEE Int. Conf. on E-Health and Bioengineering (EHB)}, Sinaia, Romania, 2017.
 
 \bibitem{Ivanov2021}
-O. Ivanov et al., ``Improving ED Emergency Severity Index Acuity Assignment...'', \emph{Journal of Emergency Nursing}, 2021.
+O. Ivanov et al., ``Improving ED emergency severity index acuity assignment using machine learning and clinical natural language processing,'' \emph{Journal of Emergency Nursing}, vol. 47, no. 2, pp. 265--278, 2021, doi: 10.1016/j.jen.2020.11.001.
+
+\bibitem{Hong2018PredictingHA}
+W. S. Hong, A. D. Haimovich, and R. A. Taylor, ``Predicting hospital admission at emergency department triage using machine learning,'' \emph{PLOS ONE}, vol. 13, no. 7, p. e0201016, 2018, doi: 10.1371/journal.pone.0201016.
+
+\bibitem{Vantu2023}
+A. Vântu, A. Vasilescu, and A. Băicoianu, ``Medical emergency department triage data processing using a machine-learning solution,'' \emph{Heliyon}, vol. 9, no. 8, p. e18402, 2023, doi: 10.1016/j.heliyon.2023.e18402.
+
+\bibitem{Yoshimura2026}
+K. Yoshimura and T. Moriguchi, ``Machine learning-based model for triage-stage prediction of emergency department disposition,'' \emph{BMC Emergency Medicine}, vol. 26, art. 110, 2026, doi: 10.1186/s12873-026-01523-w.
+
+\bibitem{Wang2023}
+B. Wang, W. Li, A. Bradlow, E. Bazuaye, and A. T. Y. Chan, ``Improving triaging from primary care into secondary care using heterogeneous data-driven hybrid machine learning,'' \emph{Decision Support Systems}, vol. 166, p. 113899, 2023, doi: 10.1016/j.dss.2022.113899.
+
+\bibitem{Fernandes}
+M. Fernandes, S. M. Vieira, F. Leite, C. Palos, S. Finkelstein, and J. M. C. Sousa, ``Clinical decision support systems for triage in the emergency department using intelligent systems: a review,'' \emph{Artificial Intelligence in Medicine}, vol. 102, p. 101762, 2020, doi: 10.1016/j.artmed.2019.101762.
+
+\bibitem{Sanchez2022}
+R. Sánchez-Salmerón et al., ``Machine learning methods applied to triage in emergency services: A systematic review,'' \emph{International Emergency Nursing}, vol. 60, p. 101109, 2022, doi: 10.1016/j.ienj.2021.101109.
+
+\bibitem{Salman2021}
+O. H. Salman et al., ``A review on utilizing machine learning technology in the fields of electronic emergency triage and patient priority systems in telemedicine: Coherent taxonomy, motivations, open research challenges and recommendations for intelligent future work,'' \emph{Computer Methods and Programs in Biomedicine}, vol. 209, p. 106357, 2021, doi: 10.1016/j.cmpb.2021.106357.
+
+\bibitem{Antoniadi}
+A. M. Antoniadi et al., ``Current challenges and future opportunities for XAI in machine learning-based clinical decision support systems: a systematic review,'' \emph{Applied Sciences}, vol. 11, no. 11, p. 5088, 2021, doi: 10.3390/app11115088.
+
+\bibitem{Liu2025}
+Z. Liu, W. Shu, H. Liu, X. Zhang, and W. Chong, ``Development and validation of interpretable machine learning models for triage patients admitted to the intensive care unit,'' \emph{PLOS ONE}, vol. 20, no. 2, p. e0317819, 2025, doi: 10.1371/journal.pone.0317819.
+
+\bibitem{SeyyedKalantari2021}
+L. Seyyed-Kalantari, H. Zhang, M. B. A. McDermott, I. Y. Chen, and M. Ghassemi, ``Underdiagnosis bias of artificial intelligence algorithms applied to chest radiographs in under-served patient populations,'' \emph{Nature Medicine}, vol. 27, pp. 2176--2182, 2021, doi: 10.1038/s41591-021-01595-0.
 
 \end{thebibliography}
-
-\bibliographystyle{plain}
-% \bibliography{biblio}
 
 \end{document}
